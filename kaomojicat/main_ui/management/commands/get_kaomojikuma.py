@@ -2,12 +2,12 @@ from django.core.management.base import BaseCommand, CommandError
 from main_ui.models import Kaomoji, KaomojiCategory
 import requests
 from bs4 import BeautifulSoup
-
+import json
 
 def find_block(tag):
     if tag.get("class") and "wp-block-heading" in tag.get("class"):
         finder = tag.next_sibling.next_sibling.next_sibling.next_sibling
-        if finder.get("name") and finder.get("name")=="cc":
+        if finder.name=="ul" and finder.get("class")==["cc"]:
             return True
     return False
 
@@ -15,12 +15,14 @@ def find_block(tag):
 class Command(BaseCommand):
     help = "Crawl kaomojies from kaomojikuma.com"
 
-    test_url = "https://kaomojikuma.com/kaomoji-greetings-japanese-emoticons/"
-    url_list = [test_url,]
 
-    urk_list = [
+    url_list = [
         ("https://kaomojikuma.com/kaomoji-greetings-japanese-emoticons/","Greetings"),
-        ("https://kaomojikuma.com/kaomoji-animals-japanese-emoticons/","Animals"),
+        # ("https://kaomojikuma.com/kaomoji-animals-japanese-emoticons/","Animals"),
+        ("https://kaomojikuma.com/kaomoji-animals-japanese-emoticons/kaomoji-bears/","Bears"),
+        ("https://kaomojikuma.com/kaomoji-animals-japanese-emoticons/kaomoji-cats/","Cats"),
+        ("https://kaomojikuma.com/kaomoji-animals-japanese-emoticons/kaomoji-dogs/","Dogs"),
+        ("https://kaomojikuma.com/kaomoji-animals-japanese-emoticons/kaomoji-bunny-rabbits/","Bunnies/Rabbit"),
         ("https://kaomojikuma.com/kaomoji-animals-japanese-emoticons/more-animals/","Exotic Animals"),
         ("https://kaomojikuma.com/kaomoji-characters-japanese-emoticons/","Characters"),
         ("https://kaomojikuma.com/positive-emotions-japanese-emoticons/","Positive"),
@@ -40,11 +42,19 @@ class Command(BaseCommand):
         ("https://kaomojikuma.com/owo-whats-this-japanese-emoticons/", "OwO What’s this?"),
         ("https://kaomojikuma.com/uwu-meme-face-emoticons/", "UwU Meme Face Emoticons"),
     ]
+    
+    def add_arguments(self, parser):
 
+        # Named (optional) arguments
+        parser.add_argument(
+            "--import",
+            action="store_true",
+            help="IMport",
+        )
 
     def handle(self, *args, **options):
-        
-        for url in self.url_list:
+        all_targets = []
+        for url, title in self.url_list:
 
             page = requests.get(url)
             soup = BeautifulSoup(page.text, "lxml")
@@ -61,7 +71,16 @@ class Command(BaseCommand):
                 }
                 targets.append(section)
 
+            pagedata = {
+                "page": url,
+                "title": title,
+                "content": targets,
+            }
+            all_targets.append(pagedata)
+            print(f"PAGEDATA: {pagedata}")
 
+        with open("./kkuma.json","w") as fout:
+            json.dump(all_targets, fout, indent=2)
 
             self.stdout.write(
-                self.style.SUCCESS('Successfully closed poll "%s"' % poll_id)
+                self.style.SUCCESS('Successfully closed poll'))
