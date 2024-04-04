@@ -42,7 +42,7 @@ class Command(BaseCommand):
         ("https://kaomojikuma.com/owo-whats-this-japanese-emoticons/", "OwO What’s this?"),
         ("https://kaomojikuma.com/uwu-meme-face-emoticons/", "UwU Meme Face Emoticons"),
     ]
-    
+
     def add_arguments(self, parser):
 
         # Named (optional) arguments
@@ -53,34 +53,61 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        all_targets = []
-        for url, title in self.url_list:
+        if options["import"]:
+            self.do_import()
+        else:
+            all_targets = []
+            for url, title in self.url_list:
 
-            page = requests.get(url)
-            soup = BeautifulSoup(page.text, "lxml")
-            targets = []
-            headers = soup.find_all(find_block)
-            descriptions = [x.next_sibling.next_sibling for x in headers]
-            kaomoji_list = [x.next_sibling.next_sibling for x in descriptions]
-            merged = tuple(zip(headers, descriptions, kaomoji_list))
-            for head, desc, kmjlist in merged:
-                section = {
-                'title': head.get_text().strip(),
-                'desc': desc.get_text().strip(),
-                'kaomoji': [x.get_text().strip() for x in kmjlist.find_all('li')],
+                page = requests.get(url)
+                soup = BeautifulSoup(page.text, "lxml")
+                targets = []
+                headers = soup.find_all(find_block)
+                descriptions = [x.next_sibling.next_sibling for x in headers]
+                kaomoji_list = [x.next_sibling.next_sibling for x in descriptions]
+                merged = tuple(zip(headers, descriptions, kaomoji_list))
+                for head, desc, kmjlist in merged:
+                    section = {
+                    'title': head.get_text().strip(),
+                    'desc': desc.get_text().strip(),
+                    'kaomoji': [x.get_text().strip() for x in kmjlist.find_all('li')],
+                    }
+                    targets.append(section)
+
+                pagedata = {
+                    "page": url,
+                    "title": title,
+                    "content": targets,
                 }
-                targets.append(section)
+                all_targets.append(pagedata)
+                print(f"PAGEDATA: {pagedata}")
 
-            pagedata = {
-                "page": url,
-                "title": title,
-                "content": targets,
-            }
-            all_targets.append(pagedata)
-            print(f"PAGEDATA: {pagedata}")
+            with open("./kkuma.json","w") as fout:
+                json.dump(all_targets, fout, indent=2)
 
-        with open("./kkuma.json","w") as fout:
-            json.dump(all_targets, fout, indent=2)
+                self.stdout.write(
+                    self.style.SUCCESS('Successfully closed poll'))
+                
 
-            self.stdout.write(
-                self.style.SUCCESS('Successfully closed poll'))
+    def do_import(self):
+        with open("./kkuma.json") as fin:
+            data = json.load(fin)
+        parent_cate_names = list(set([x['title'] for x in data]))
+        for name in parent_cate_names:
+            k, k_is_done = KaomojiCategory.objects.get_or_create(name=name)
+            print(f"Created {k}")
+        for page in data:
+            parentcat = KaomojiCategory.objects.filter(name=page['title']).first()
+            for sub in page['content']:
+                name = sub['title']
+                subcat = KaomojiCategory.objects.create(
+                        name=name, description=sub['desc'], parent=parentcat)
+                self.stdout.write(
+                    self.style.WARNING(f'Successfully created {subcat} in {parentcat}'))
+                for k in sub['kaomoji']:
+                    kd = Kaomoji.objects.create(kaomoji=k, category=subcat)
+                    self.stdout.write(
+                        self.style.NOTICE(f'Successfully created {k} in {subcat}'))
+
+        
+        
