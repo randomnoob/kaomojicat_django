@@ -12,7 +12,7 @@ class Category(models.Model):
 class KaomojiCategory(models.Model):
     name = models.CharField(max_length=30)
     description = models.TextField()
-    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children', related_query_name='child')
 
     class Meta:
         # Optionally, ensure that each category name is unique within its parent category
